@@ -24,7 +24,7 @@ A graphical abstract of the study could also be included as an image here.
 - `Spatial Resolution`: Census Block Groups 
 - `Spatial Reference System`: EPSG:4269 NAD 1983 Geographic Coordinate System
 - `Temporal Coverage`: 2020-2023
-- `Temporal Resolution`: Specify the temporal resolution of your study---i.e. the duration of time for which each observation represents or the revisit period for repeated observations
+- `Temporal Resolution`: Decadal Census
 - `Funding Name`: name of funding for the project
 - `Funding Title`: title of project grant
 - `Award info URI`: web address for award information
