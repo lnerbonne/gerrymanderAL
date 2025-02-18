@@ -1,4 +1,4 @@
-# Gerrymeandering in Alabama
+# Gerrymandering in Alabama
 
 ## Contributors
 
@@ -7,7 +7,7 @@
 ## Abstract
 
 Write a brief abstract about your research project.
-This is a study of gerrymeandering in Alabama. We will test different metrics of spatial compactness and diversity to assess their efficacy in predicting the representiveness of different voting districts. We will then extend prior studies by calculating representivness using both district compactness and racial diversity to incorporate both commonly used metrics of representation. 
+This is a study of gerrymandering in Alabama. We will test different metrics of spatial compactness and diversity to assess their efficacy in predicting the representiveness of different voting districts. We will then extend prior studies by calculating representivness using both district compactness and racial diversity to incorporate both commonly used metrics of representation. 
 
 write more here later- short paragraph about the goals of the study. clean this up this sounds terrible. 
 > citation to prior study
@@ -16,7 +16,7 @@ A graphical abstract of the study could also be included as an image here.
 
 ## Study Metadata
 
-- `Key words`: Political Representation, Gerrymeandering, Alabama, Convex Hull, Elections
+- `Key words`: Political Representation, Gerrymandering, Alabama, Convex Hull, Elections
 - `Subject`: Social and Behavioral Sciences: Geography: Geographic Information Sciences
 - `Date created`: 2025-02-17
 - `Date modified`: 2020-02-17
@@ -25,10 +25,6 @@ A graphical abstract of the study could also be included as an image here.
 - `Spatial Reference System`: EPSG:4269 NAD 1983 Geographic Coordinate System
 - `Temporal Coverage`: 2020-2023
 - `Temporal Resolution`: Decadal Census
-- `Funding Name`: name of funding for the project
-- `Funding Title`: title of project grant
-- `Award info URI`: web address for award information
-- `Award number`: award number
 
 ## Related to
 
