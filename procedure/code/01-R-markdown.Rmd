@@ -14,7 +14,7 @@ knit: (function(inputFile, encoding) {
 
 ## Contributors
 
-- Lucas Nerbonne, lnerbonne@middlebury.edu, Middlebury College Earth and Climate Sciences Department, Middlebury Geopgraphy Department
+- Lucas Nerbonne, lnerbonne@middlebury.edu, Middlebury College Earth and Climate Sciences Department, Middlebury Geography Department
 
 ## Abstract
 
@@ -214,9 +214,20 @@ Because it's difficult to know how this systemic undercounting might effect area
 
 ###Data Initialization
 
-Fuction: read_sf
-Variables: None
-Objective: initialize the data in the R environment. 
+
+
+```{r}
+library(tidyverse)
+library(sf)
+library(here)
+
+#Function: read_sf
+#Variables: None
+#Objective: initialize the data in the R environment.
+
+districts<- read_sf(districts.gpkg)
+
+```
 
 
 
