@@ -121,6 +121,19 @@ Each of the next subsections describes one data source.
 - `Distribution`: US Census API
 - `Constraints`: Public Domain data free for use and redistribution.
 
+Query specifics: 
+```{r}
+blockgroups <- get_decennial(geography = "block group",
+                               sumfile = "pl",
+                               table = "P3",
+                               year = 2020,
+                               state = "Alabama",
+                               output = "wide",
+                               geometry = TRUE,
+                               keep_geo_vars = TRUE)
+```
+
+
 | Label | Alias | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
 | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
 | GEOID | ID Code | Code that uniquely identifies census tracts  | Numeric | N/A | ... | ... | ... |
@@ -212,27 +225,54 @@ Because it's difficult to know how this systemic undercounting might effect area
 
 ## Data transformations
 
-###Data Initialization
+### Coordinate Transformation
 
+Transform the Census coordinate systen to match that of the districts and precincts layer
 
-
-```{r}
-library(tidyverse)
-library(sf)
-library(here)
-
-#Function: read_sf
-#Variables: None
-#Objective: initialize the data in the R environment.
-
-districts<- read_sf(districts.gpkg)
-
+```{r}  
+blockgroups<-blockgroups%>%
+  st_transform(crs = 3857)
 ```
 
+### Calculate the total Black/African American population in each block group
+
+The Census makes it tricky to pull the 'black' population data because of the plethora of different combinations of race designations that respondents can use to describe their racial identity. For example, someone who responds that they are both Hispanic AND Black, they will have a different designation than someone who responds as only black. For this study, we're going to consider the hispanic and black individual black, so that designation's population total will need to be added to the overall black population total.
+
+To gather this data, I'll gather a list of all the words that might be used to describe a black individual. Code courtesy of Joseph Holler's Github, because I had no idea how to do this.
+
+```{r}
+pulled_metadata <- load_variables(2020, "pl")
+black_vars <- pulled_metadata |> 
+  dplyr::filter(str_detect(name, "P3"), #P3 are population columns that include race designations
+                str_detect(label, "Black")) |> #pulls only the data where there label column includes 'Black'
+  select(-concept) #excludes the descriptor label column
+```
+
+Next, I'll use this list to aggregate population data from the columns that are included in the 'black_vars' list. 
+
+```{r}
+blockgroups2<-blockgroups%>%
+  mutate(BlackPopulation = rowSums(across(all_of(black_vars$name))))
+
+final_population <- blockgroups2 %>%
+  mutate(
+    Total_POP = P3_001N,
+    Black_POP = BlackPopulation,
+    Black_Percentage = BlackPopulation / P3_001N
+  ) %>%
+  select(GEOID, Total_POP, Black_POP, Black_Percentage)
+```
+
+This code chunk will output a table named 'final_population' with four columns- their names and descriptors are below.
+Total_POP: Total population in each census block 
+Black_POP: Total black population in each census block
+Black_Percentage: The percentage of each census block that at minimum partially identifies as black
+
+```{r}
 
 
 
-
+```
 
 The method may anticipate **contingencies**, e.g. tests for normality and alternative decisions to make based on the results of the test.
 More specifically, all the **geographic** and **variable** transformations required to prepare input data as described in the data and variables section above to match the study's spatio-temporal characteristics as described in the study metadata and study design sections.
