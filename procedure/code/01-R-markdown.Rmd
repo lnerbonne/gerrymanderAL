@@ -14,17 +14,13 @@ knit: (function(inputFile, encoding) {
 
 ## Contributors
 
-- Lucas Nerbonne, lnerbonne@middlebury.edu, Middlebury College Earth and Climate Sciences Department
+- Lucas Nerbonne, lnerbonne@middlebury.edu, Middlebury College Earth and Climate Sciences Department, Middlebury Geopgraphy Department
 
 ## Abstract
 
-Write a brief abstract about your research project.
-This is a study of gerrymeandering in Alabama. We will test different metrics of spatial compactness and diversity to assess their efficacy in predicting the representiveness of different voting districts. We will then extend prior studies by calculating representivness using both district compactness and racial diversity to incorporate both commonly used metrics of representation. 
-
-write more here later- short paragraph about the goals of the study. clean this up this sounds terrible. 
-> citation to prior study
-
-A graphical abstract of the study could also be included as an image here.
+This is a study of gerrymandering in Alabama.
+ We will test different metrics of spatial compactness and diversity to assess their efficacy in predicting the representiveness of different voting districts. 
+ We will then extend the work of prior studies by calculating a representivness metric to combines social and geographic metrics of 'fairness'. 
 
 ## Study Metadata
 
@@ -33,14 +29,16 @@ A graphical abstract of the study could also be included as an image here.
 - `Date created`: 2025-02-17
 - `Date modified`: 2020-02-17
 - `Spatial Coverage`: Alabama (State)
-- `Spatial Resolution`: Census Block Groups 
+- `Spatial Resolution`: Census block groups
 - `Spatial Reference System`: EPSG:4269 NAD 1983 Geographic Coordinate System
 - `Temporal Coverage`: 2020-2023
 - `Temporal Resolution`: Decennial Census
 
 # Study design
 
-An original, exploratory study assessing the comparative efficacy of commonly used to quantify degreess of district gerrymandering. We will also assess the usefulness of a new gerrymandering metric based on the convex hull of a congressional district and the representativeness inside the convex hull compared to the congressional district itself. 
+An original, exploratory study assessing the comparative findings of commonly used to quantify degreess of congressional district gerrymandering.
+ We will also assess the usefulness of a new gerrymandering metric based on the convex hull of a congressional district and the 
+representativeness inside the convex hull compared to the congressional district writ large. 
 
 Enumerate specific **hypotheses** to be tested or **research questions** to be investigated here, and specify the type of method, statistical test or model to be used on the hypothesis or question.
 
@@ -112,70 +110,65 @@ Secondary data sources for the study are to include ... .
 
 Each of the next subsections describes one data source.
 
-### Primary data source1 name
+### Alabama Census Block Groups
 
-- `Title`: Title of data source
-- `Abstract`: Brief description of the data source
-- `Spatial Coverage`: Specify the geographic extent of your study. This may be a place name and link to a feature in a gazetteer like GeoNames or OpenStreetMap, or a well known text (WKT) representation of a bounding box.
-- `Spatial Resolution`: Specify the spatial resolution as a scale factor, description of the level of detail of each unit of observation (including administrative level of administrative areas), and/or or distance of a raster GRID size
-- `Spatial Reference System`: Specify the geographic or projected coordinate system for the study
-- `Temporal Coverage`: Specify the temporal extent of your study---i.e. the range of time represented by the data observations.
-- `Temporal Resolution`: Specify the temporal resolution of your study---i.e. the duration of time for which each observation represents or the revisit period for repeated observations
-- `Lineage`: Describe and/or cite data sources and/or methodological steps planned to create this data source.
-  - sampling scheme, including spatial sampling
-  - target sample size and method for determining sample size
-  - stopping criteria for data collection and sampling (e.g. sample size, time elapsed)
-  - de-identification / anonymization
-  - experimental manipulation
-- `Distribution`: Describe who will make the data available and how?
-- `Constraints`: Legal constraints for *access* or *use* to protect *privacy* or *intellectual property rights*
-- `Data Quality`: State any planned quality assessment
-- `Variables`: For each variable, enter the following information. If you have two or more variables per data source, you may want to present this information in table form (shown below)
-  - `Label`: variable name as used in the data or code
-  - `Alias`: intuitive natural language name
-  - `Definition`: Short description or definition of the variable. Include measurement units in description.
-  - `Type`: data type, e.g. character string, integer, real
-  - `Accuracy`: e.g. uncertainty of measurements
-  - `Domain`: Expected range of Maximum and Minimum of numerical data, or codes or categories of nominal data, or reference to a standard codebook
-  - `Missing Data Value(s)`: Values used to represent missing data and frequency of missing data observations
-  - `Missing Data Frequency`: Frequency of missing data observations: not yet known for data to be collected
+- `Abstract`: Vector polygon geopackage layer of Census tracts and demographic data.
+- `Spatial Coverage`: Alabama (State). OSM link: [https://www.openstreetmap.org/relation/161950]
+- `Spatial Resolution`: Census block groups
+- `Spatial Reference System`: EPSG 4269 NAD 1983 geographic coordinate system
+- `Temporal Coverage`: 2020 census 
+- `Temporal Resolution`: Single census survey period
+- `Lineage`: Downloaded from the U.S. Census APL "pl" public law summary file using 'tidycensus' in R
+- `Distribution`: US Census API
+- `Constraints`: Public Domain data free for use and redistribution.
 
 | Label | Alias | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
 | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
-| variable1 | ... | ... | ... | ... | ... | ... | ... |
-| variable2 | ... | ... | ... | ... | ... | ... | ... |
+| GEOID | ID Code | Code that uniquely identifies census tracts  | Numeric | N/A | ... | ... | ... |
+| P4_001N | Total population over 18 | Total population over 18 years old in the 2020 census, divided by block group | Numeric | Generally Accurate | ... | ... | ... |
+P4_006N | Total black population over 18 | Total black population over 18 years old in the 2020 census, divided by block group | Numeric | The US Census tends to overcount white populations and undercount those of minorities ([US Census](https://www.census.gov/newsroom/press-releases/2022/2020-census-estimates-of-undercount-and-overcount.html)) | ... | ... | ... |
+| P5_003N | Institutionalized population | Total institutionalized population in correctional facilities for adults during the 2020 census, 18 years or older divided by block group  | Numeric | The US Census tends to overcount white populations and undercount those of minorities ([US Census](https://www.census.gov/newsroom/press-releases/2022/2020-census-estimates-of-undercount-and-overcount.html)) | ... | ... | ... |
+| 
 
-### Primary data source2 name
+### Voting Precincts from 2020 Presidential Election 
 
-... same form as above...
+- `Abstract`: Voting data by precinct 
+- `Spatial Coverage`: Alabama (State). OSM link: [https://www.openstreetmap.org/relation/161950]
+- `Spatial Resolution`: Voting Precincts 
+- `Spatial Reference System`: EPSG 4269 NAD 1983 Geographic Coordinate System
+- `Temporal Coverage`: One Year
+- `Temporal Resolution`: 2020
+- `Lineage`: Downloaded as a sgpkg. Prior processing information is avalible in al_vest_20_validation_report.pdf and readme_al_vest_20.txt
+- `Distribution`: Publically avalible at the Redistricting Hub website with free login.
+- `Constraints`: Permitted for noncommercial and nonpartisan use only, as per original data access agreement. Copyright information found in redistrictingdatahub_legal.txt
+- `Data Quality`: Complete
+
+| Label | Alias | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
+| :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| VTDST20 | District ID | Voting District ID | Numeric | ... | ... | ... | ... |
+| GEOID20 | Location | Unique Geographic ID | Coordinate | ... | ... | ... | ... |
+| G20PRETRU | Republican Voters | Total votes for Donald Trump in 2020 | Numeric | ... | ... | ... | ... |
+| G20PREBID | Democratic Voters | Total votes for Joe Biden in 2020 | Numeric | ... | ... | ... | ... |
 
 ### Secondary data source1 name
 
-- `Title`: Title of data source
-- `Abstract`: Brief description of the data source
-- `Spatial Coverage`: Specify the geographic extent of your study. This may be a place name and link to a feature in a gazetteer like GeoNames or OpenStreetMap, or a well known text (WKT) representation of a bounding box.
-- `Spatial Resolution`: Specify the spatial resolution as a scale factor, description of the level of detail of each unit of observation (including administrative level of administrative areas), and/or or distance of a raster GRID size
-- `Spatial Reference System`: Specify the geographic or projected coordinate system for the study
-- `Temporal Coverage`: Specify the temporal extent of your study---i.e. the range of time represented by the data observations.
-- `Temporal Resolution`: Specify the temporal resolution of your study---i.e. the duration of time for which each observation represents or the revisit period for repeated observations
-- `Lineage`: Describe and/or cite data sources and/or methodological steps used to create this data source
-- `Distribution`: Describe how the data is distributed, including any persistent identifier (e.g. DOI) or URL for data access
-- `Constraints`: Legal constraints for *access* or *use* to protect *privacy* or *intellectual property rights*
-- `Data Quality`: State result of quality assessment or state "Quality unknown"
-- `Variables`: For each variable, enter the following information. If you have two or more variables per data source, you may want to present this information in table form (shown below)
-  - `Label`: variable name as used in the data or code
-  - `Alias`: intuitive natural language name
-  - `Definition`: Short description or definition of the variable. Include measurement units in description.
-  - `Type`: data type, e.g. character string, integer, real
-  - `Accuracy`: e.g. uncertainty of measurements
-  - `Domain`: Range (Maximum and Minimum) of numerical data, or codes or categories of nominal data, or reference to a standard codebook
-  - `Missing Data Value(s)`: Values used to represent missing data and frequency of missing data observations
-  - `Missing Data Frequency`: Frequency of missing data observations
+- `Title`: districts23 Layer of districts.gpkg
+- `Abstract`: Spatial bounds and characteristics of U.S. Congressional districts in Alabama
+- `Spatial Coverage`: Alabama (State). OSM link: [https://www.openstreetmap.org/relation/161950]
+- `Spatial Resolution`: U.S. Congressional Districts
+- `Spatial Reference System`: EPSG 3857 WGS 1984 Web Mercator Projection
+- `Temporal Coverage`: Districts approved in 2023 for use in the 2024 elections.
+- `Temporal Resolution`: N/A
+- `Lineage`: Loaded into QGIS as ArcGIS feature service layer and saved in geopackage format. Etraneous data fields were removed and the FIX GEOMETRIES tool was used to correect geometry errors. 
+- `Distribution`: Avalible from the Alabama State GIS via ESRI feature service 
+- `Constraints`: Public Domain data free for use and redistribution.
 
 | Label | Alias | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
 | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
-| variable1 | ... | ... | ... | ... | ... | ... | ... |
-| variable2 | ... | ... | ... | ... | ... | ... | ... |
+| DISTRICT | District Number | U.S. Congressional District Number | Numeric | N/A | N/A | N/A | N/A |
+| POPULATION | Population | Number of people residing in each congressional district (2020 census) | Numeric | Generally accurate on a full-population scale | ... | ... | ... |
+| WHITE | Number of white residents | Total number of white residents (2020 census) | Numeric | The US Census tends to overcount white populations and undercount those of minorities ([US Census](https://www.census.gov/newsroom/press-releases/2022/2020-census-estimates-of-undercount-and-overcount.html)) | ... | ... | ... |
+| BLACK | Number of black residents | Total number of black residents (US Census) | Numeric | The US Census tends to overcount white populations and undercount those of minorities ([US Census](https://www.census.gov/newsroom/press-releases/2022/2020-census-estimates-of-undercount-and-overcount.html)) | ... | ... | ... |
 
 ### Secondary data source2 name
 
