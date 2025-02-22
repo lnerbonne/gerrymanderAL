@@ -1,0 +1,4 @@
+path,name,metadata,description
+raw/public/districts.gpkg:precincts20,2020 Voting Precincts,gerrymeanderAL/data/metadata/precincts20.md,Voting Precincts with 2020 Election Results
+raw/public/districts.gpkg:districts21,,,
+raw/public/districts.gpkg:districts23,,,

@@ -1,0 +1,264 @@
+---
+title: "Alabama Gerrymandering"
+author: "Lucas Nerbonne"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options:
+  markdown:
+    wrap: sentence
+knit: (function(inputFile, encoding) {
+  rmarkdown::render(inputFile, encoding = encoding, output_dir = "../../docs/report") })
+---
+
+# Gerrymeandering in Alabama
+
+## Contributors
+
+- Lucas Nerbonne, lnerbonne@middlebury.edu, Middlebury College Earth and Climate Sciences Department, Middlebury Geopgraphy Department
+
+## Abstract
+
+This is a study of gerrymandering in Alabama.
+ We will test different metrics of spatial compactness and diversity to assess their efficacy in predicting the representiveness of different voting districts. 
+ We will then extend the work of prior studies by calculating a representivness metric to combines social and geographic metrics of 'fairness'. 
+
+## Study Metadata
+
+- `Key words`: Political Representation, Gerrymeandering, Alabama, Convex Hull, Elections
+- `Subject`: Social and Behavioral Sciences: Geography: Geographic Information Sciences
+- `Date created`: 2025-02-17
+- `Date modified`: 2020-02-17
+- `Spatial Coverage`: Alabama (State)
+- `Spatial Resolution`: Census block groups
+- `Spatial Reference System`: EPSG:4269 NAD 1983 Geographic Coordinate System
+- `Temporal Coverage`: 2020-2023
+- `Temporal Resolution`: Decennial Census
+
+# Study design
+
+An original, exploratory study assessing the comparative findings of commonly used to quantify degreess of congressional district gerrymandering.
+ We will also assess the usefulness of a new gerrymandering metric based on the convex hull of a congressional district and the 
+representativeness inside the convex hull compared to the congressional district writ large. 
+
+Enumerate specific **hypotheses** to be tested or **research questions** to be investigated here, and specify the type of method, statistical test or model to be used on the hypothesis or question.
+
+# Materials and procedure
+
+## Computational environment
+
+I plan on using ___ for ____. 
+
+```{r environment-setup, include = FALSE}
+# record all the packages you are using here
+# this includes any calls to library(), require(),
+# and double colons such as here::i_am()
+packages <- c("tidyverse", "here", "sf", "tmap", "tidycensus")
+
+# force all conflicts to become errors
+# if you load dplyr and use filter(), R has to guess whether you mean dplyr::filter() or stats::filter()
+# the conflicted package forces you to be explicit about this
+# disable at your own peril
+# https://conflicted.r-lib.org/
+require(conflicted)
+
+# load and install required packages
+# https://groundhogr.com/
+if (!require(groundhog)) {
+  install.packages("groundhog")
+  require(groundhog)
+}
+
+# this date will be used to determine the versions of R and your packages
+# it is best practice to keep R and its packages up to date
+groundhog.day <- "2025-02-01"
+
+# this replaces any library() or require() calls
+groundhog.library(packages, groundhog.day)
+# you may need to install a correct version of R
+# you may need to respond OK in the console to permit groundhog to install packages
+# you may need to restart R and rerun this code to load installed packages
+# In RStudio, restart r with Session -> Restart Session
+
+# record the R processing environment
+# alternatively, use devtools::session_info() for better results
+writeLines(
+  capture.output(sessionInfo()),
+  here("procedure", "environment", paste0("r-environment-", Sys.Date(), ".txt"))
+)
+
+# save package citations
+knitr::write_bib(c(packages, "base"), file = here("software.bib"))
+
+# set up default knitr parameters
+# https://yihui.org/knitr/options/
+knitr::opts_chunk$set(
+  echo = FALSE, # Run code, show outputs (don't show code)
+  fig.retina = 4,
+  fig.width = 8,
+  fig.path = paste0(here("results", "figures"), "/")
+)
+```
+
+## Data and variables
+
+Describe the **data sources** and **variables** to be used.
+Data sources may include plans for observing and recording **primary data** or descriptions of **secondary data**.
+For secondary data sources with numerous variables, the analysis plan authors may focus on documenting only the variables intended for use in the study.
+
+Primary data sources for the study are to include census block groups, alabama congressional districts, and presidential voting totals from the 2020 election.
+
+Each of the next subsections describes one data source.
+
+### Alabama Census Block Groups
+
+- `Abstract`: Vector polygon geopackage layer of Census tracts and demographic data.
+- `Spatial Coverage`: Alabama (State). OSM link: [https://www.openstreetmap.org/relation/161950]
+- `Spatial Resolution`: Census block groups
+- `Spatial Reference System`: EPSG 4269 NAD 1983 geographic coordinate system
+- `Temporal Coverage`: 2020 census 
+- `Temporal Resolution`: Single census survey period
+- `Lineage`: Downloaded from the U.S. Census APL "pl" public law summary file using 'tidycensus' in R
+- `Distribution`: US Census API
+- `Constraints`: Public Domain data free for use and redistribution.
+
+| Label | Alias | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
+| :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| GEOID | ID Code | Code that uniquely identifies census tracts  | Numeric | N/A | ... | ... | ... |
+| P4_001N | Total population over 18 | Total population over 18 years old in the 2020 census, divided by block group | Numeric | Generally Accurate | ... | ... | ... |
+P4_006N | Total black population over 18 | Total black population over 18 years old in the 2020 census, divided by block group | Numeric | The US Census tends to overcount white populations and undercount those of minorities ([US Census](https://www.census.gov/newsroom/press-releases/2022/2020-census-estimates-of-undercount-and-overcount.html)) | ... | ... | ... |
+| P5_003N | Institutionalized population | Total institutionalized population in correctional facilities for adults during the 2020 census, 18 years or older divided by block group  | Numeric | The US Census tends to overcount white populations and undercount those of minorities ([US Census](https://www.census.gov/newsroom/press-releases/2022/2020-census-estimates-of-undercount-and-overcount.html)) | ... | ... | ... |
+| 
+
+### Voting Precincts from 2020 Presidential Election 
+
+- `Abstract`: Voting data by precinct 
+- `Spatial Coverage`: Alabama (State). OSM link: [https://www.openstreetmap.org/relation/161950]
+- `Spatial Resolution`: Voting Precincts 
+- `Spatial Reference System`: EPSG 4269 NAD 1983 Geographic Coordinate System
+- `Temporal Coverage`: One Year
+- `Temporal Resolution`: 2020
+- `Lineage`: Downloaded as a sgpkg. Prior processing information is avalible in al_vest_20_validation_report.pdf and readme_al_vest_20.txt
+- `Distribution`: Publically avalible at the Redistricting Hub website with free login.
+- `Constraints`: Permitted for noncommercial and nonpartisan use only, as per original data access agreement. Copyright information found in redistrictingdatahub_legal.txt
+- `Data Quality`: Complete
+
+| Label | Alias | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
+| :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| VTDST20 | District ID | Voting District ID | Numeric | ... | ... | ... | ... |
+| GEOID20 | Location | Unique Geographic ID | Coordinate | ... | ... | ... | ... |
+| G20PRETRU | Republican Voters | Total votes for Donald Trump in 2020 | Numeric | ... | ... | ... | ... |
+| G20PREBID | Democratic Voters | Total votes for Joe Biden in 2020 | Numeric | ... | ... | ... | ... |
+
+### districts23 Layer of districts.gpkg
+
+- `Abstract`: Spatial bounds and characteristics of U.S. Congressional districts in Alabama
+- `Spatial Coverage`: Alabama (State). OSM link: [https://www.openstreetmap.org/relation/161950]
+- `Spatial Resolution`: U.S. Congressional Districts
+- `Spatial Reference System`: EPSG 3857 WGS 1984 Web Mercator Projection
+- `Temporal Coverage`: Districts approved in 2023 for use in the 2024 elections.
+- `Temporal Resolution`: N/A
+- `Lineage`: Loaded into QGIS as ArcGIS feature service layer and saved in geopackage format. Etraneous data fields were removed and the FIX GEOMETRIES tool was used to correect geometry errors. 
+- `Distribution`: Avalible from the Alabama State GIS via ESRI feature service 
+- `Constraints`: Public Domain data free for use and redistribution.
+
+| Label | Alias | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
+| :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| DISTRICT | District Number | U.S. Congressional District Number | Numeric | N/A | N/A | N/A | N/A |
+| POPULATION | Population | Number of people residing in each congressional district (2020 census) | Numeric | Generally accurate on a full-population scale | ... | ... | ... |
+| WHITE | Number of white residents | Total number of white residents (2020 census) | Numeric | The US Census tends to overcount white populations and undercount those of minorities ([US Census](https://www.census.gov/newsroom/press-releases/2022/2020-census-estimates-of-undercount-and-overcount.html)) | ... | ... | ... |
+| BLACK | Number of black residents | Total number of black residents (US Census) | Numeric | The US Census tends to overcount white populations and undercount those of minorities ([US Census](https://www.census.gov/newsroom/press-releases/2022/2020-census-estimates-of-undercount-and-overcount.html)) | ... | ... | ... |
+
+
+## Prior observations/bias  
+
+Prior experience with the study area, prior data collection, or prior observation of the data can compromise the validity of a study, e.g. through p-hacking.
+Therefore, disclose any prior experience or observations at the time of study pre-registration here, with example text below:
+
+At the time of this study pre-registration, the authors had very little prior knowledge of the geography of the study region with regards to the potential gerrymandering congressional districts.
+The study authors have some prior knowlege of the racial distribution of populations in the state as they pertain to historical settlement (oftentimes forced) patterns. 
+
+For each secondary source, declare the extent to which authors had already engaged with the data:
+
+###Alabama Census Block Groups
+- [ ] data is not available yet
+- [x] data is available, but only metadata has been observed
+- [ ] metadata and descriptive statistics have been observed
+- [ ] metadata and a pilot test subset or sample of the full dataset have been observed
+- [ ] the full dataset has been observed. Explain how authors have already manipulated / explored the data.
+
+###2020 Presidential Election Voting Precincts
+- [ ] data is not available yet
+- [x] data is available, but only metadata has been observed
+- [ ] metadata and descriptive statistics have been observed
+- [ ] metadata and a pilot test subset or sample of the full dataset have been observed
+- [ ] the full dataset has been observed. Explain how authors have already manipulated / explored the data.
+- [ ] data is not available yet
+
+###Districts23 layer of districts.gpkg
+- [ ] data is not available yet
+- [x] data is available, but only metadata has been observed
+- [ ] metadata and descriptive statistics have been observed
+- [ ] metadata and a pilot test subset or sample of the full dataset have been observed
+- [ ] the full dataset has been observed. Explain how authors have already manipulated / explored the data.
+- [ ] data is not available yet
+
+
+## Bias and threats to validity
+
+Because primary data is not being incorporated in this study, potential sources of bias are limited. The data utilized in this study is generally considered reputable (census, voting totals),
+although at larger scales the 2020 census has been seen to systematically undercount minorities, a trend that may impact the racial distribution section of this study by not accuratly giving a measure of the relative diversity of different block groups. 
+Because it's difficult to know how this systemic undercounting might effect areas differently, I will not attempt to make any corrections for it. 
+
+
+## Data transformations
+
+###Data Initialization
+
+Fuction: read_sf
+Variables: None
+Objective: initialize the data in the R environment. 
+
+
+
+
+
+
+The method may anticipate **contingencies**, e.g. tests for normality and alternative decisions to make based on the results of the test.
+More specifically, all the **geographic** and **variable** transformations required to prepare input data as described in the data and variables section above to match the study's spatio-temporal characteristics as described in the study metadata and study design sections.
+Visual workflow diagrams may help communicate the methodology in this section.
+
+Examples of **geographic** transformations include coordinate system transformations, aggregation, disaggregation, spatial interpolation, distance calculations, zonal statistics, etc.
+
+Examples of **variable** transformations include standardization, normalization, constructed variables, imputation, classification, etc.
+
+Be sure to include any steps planned to **exclude** observations with *missing* or *outlier* data, to **group** observations by *attribute* or *geographic* criteria, or to **impute** missing data or apply spatial or temporal **interpolation**.
+
+## Analysis
+
+Describe the methods of analysis that will directly test the hypotheses or provide results to answer the research questions.
+This section should explicitly define any spatial / statistical *models* and their *parameters*, including *grouping* criteria, *weighting* criteria, and *significance thresholds*.
+Also explain any follow-up analyses or validations.
+
+# Results
+
+Describe how results are to be presented.
+
+# Discussion
+
+Describe how the results are to be interpreted *vis a vis* each hypothesis or research question.
+
+# Integrity Statement
+
+Include an integrity statement - The authors of this preregistration state that they completed this preregistration to the best of their knowledge and that no other preregistration exists pertaining to the same hypotheses and research.
+If a prior registration *does* exist, explain the rationale for revising the registration here.
+
+# Acknowledgements
+
+- `Funding Name`: name of funding for the project
+- `Funding Title`: title of project grant
+- `Award info URI`: web address for award information
+- `Award number`: award number
+
+This report is based upon the template for Reproducible and Replicable Research in Human-Environment and Geographical Sciences, DOI:[10.17605/OSF.IO/W29MQ](https://doi.org/10.17605/OSF.IO/W29MQ)
+
+# References
