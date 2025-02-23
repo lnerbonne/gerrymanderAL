@@ -70,7 +70,7 @@ if (!require(groundhog)) {
 
 # this date will be used to determine the versions of R and your packages
 # it is best practice to keep R and its packages up to date
-groundhog.day <- "2025-02-01"
+groundhog.day <- "2025-02-19"
 
 # this replaces any library() or require() calls
 groundhog.library(packages, groundhog.day)
@@ -268,11 +268,49 @@ Total_POP: Total population in each census block
 Black_POP: Total black population in each census block
 Black_Percentage: The percentage of each census block that at minimum partially identifies as black
 
+### Calculate area for each district
+
+I'll calculate three separate compactness metrics that all are in the form of area vs perimeter (Polsby-Popper metric), convex hull area, and minimum bounding circle area. 
+
 ```{r}
+library(sf)
+districts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "districts23")
+districts1 <- mutate(districts, 
+                     districts_area = st_area(geom),
+                     districts_perim = st_perimeter(geom),
+                     polsby_popper = round(
+                       as.numeric(
+                         (4 * pi * districts_area) / districts_perim^2),
+                       2))%>%
+  select(DISTRICT, districts_area, districts_perim,polsby_popper)
 
+#create a seperate layer, districts_convex, that saves creates a convex hull for each district
+districts_convex <- districts1%>%
+  st_convex_hull()
+districts_convex <- districts_convex |> 
+  mutate(hullarea = st_area(geom),
+         compact_hull = round(as.numeric(districts_area / hullarea), 2))
 
+#calculates the area of the convex hull of each district 
+districts_convex<- districts_convex%>%
+  mutate(ch_area = st_area(districts_convex))
 
 ```
+
+This gives us both district and the convex hull of each district layers 
+
+#drop geometry of the convex hull layer
+districts_convex_df <- st_drop_geometry(districts_convex)
+
+#join the convex hull df to the districts geometries, matching the congressional district numerical designation.
+districts <- left_join(districts, select(districts_convex_df, DISTRICT, ch_area, total_pop_ch, total_black_pop_ch, by = "DISTRICT")
+```
+
+### Compactness metric
+
+
+
+
 
 The method may anticipate **contingencies**, e.g. tests for normality and alternative decisions to make based on the results of the test.
 More specifically, all the **geographic** and **variable** transformations required to prepare input data as described in the data and variables section above to match the study's spatio-temporal characteristics as described in the study metadata and study design sections.
