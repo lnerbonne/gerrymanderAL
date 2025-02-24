@@ -46,9 +46,7 @@ Enumerate specific **hypotheses** to be tested or **research questions** to be i
 
 ## Computational environment
 
-I plan on using ___ for ____. 
-
-```{r environment-setup, include = FALSE}
+```{r environment-setup}
 # record all the packages you are using here
 # this includes any calls to library(), require(),
 # and double colons such as here::i_am()
@@ -121,8 +119,8 @@ Each of the next subsections describes one data source.
 - `Distribution`: US Census API
 - `Constraints`: Public Domain data free for use and redistribution.
 
-Query specifics: 
-```{r}
+Aquiring data using **tidycensus** in *R* 
+```{r, eval=FALSE, echo=TRUE}
 blockgroups <- get_decennial(geography = "block group",
                                sumfile = "pl",
                                table = "P3",
@@ -226,7 +224,8 @@ Because it's difficult to know how this systemic undercounting might effect area
 
 Transform the Census coordinate systen to match that of the districts and precincts layer
 
-```{r}  
+```{r, eval=FALSE, echo=TRUE}  
+library(tidyverse)
 blockgroups<-blockgroups%>%
   st_transform(crs = 3857)
 ```
@@ -237,7 +236,7 @@ The Census makes it tricky to pull the 'black' population data because of the pl
 
 To gather this data, I'll gather a list of all the words that might be used to describe a black individual. Code courtesy of Joseph Holler's Github, because I had no idea how to do this.
 
-```{r}
+```{r, eval=FALSE, echo=TRUE}
 pulled_metadata <- load_variables(2020, "pl")
 black_vars <- pulled_metadata |> 
   dplyr::filter(str_detect(name, "P3"), #P3 are population columns that include race designations
@@ -247,7 +246,7 @@ black_vars <- pulled_metadata |>
 
 Next, I'll use this list to aggregate population data from the columns that are included in the 'black_vars' list. 
 
-```{r}
+```{r, eval=FALSE, echo=TRUE}
 blockgroups2<-blockgroups%>%
   mutate(BlackPopulation = rowSums(across(all_of(black_vars$name))))
 
@@ -269,7 +268,7 @@ Black_Percentage: The percentage of each census block that at minimum partially 
 
 I'll calculate three separate compactness metrics that all are in the form of area vs perimeter (Polsby-Popper metric), convex hull area, and minimum bounding circle area. 
 
-```{r}
+```{r, eval=FALSE, echo=TRUE}
 #sf_use_s2 is set to FALSE to calculate ellipsoidal area instead of spherical  
 sf_use_s2(FALSE)
 
@@ -279,7 +278,7 @@ districts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"),
 #calculate area/perimeter metric (polsby-popper)
 districts1 <- mutate(districts, 
                      districts_area = st_area(geom),
-                     districts_perim = st_perimeter(geom),
+                     districts_perim = st_length(st_cast(st_cast(geom, "MULTIPOLYGON"), "MULTILINESTRING")),
                      polsby_popper = round(
                        as.numeric(
                          (4 * pi * districts_area) / districts_perim^2),
@@ -315,11 +314,13 @@ This gives us the compactness scores from each of our three metrics in the same 
 
 To gather the population race breakdown for each district, we'll employ our block group data that we cleaned earlier. The block group data needs to be split by district, convex hull, and minimum bounding circle so that we can get an accurate measure of population- to do this, it also needs to undergo area weighted reaggregation to properly apportion population on either side of a split. This introduces more error into our calculations, as people don't evenly distribute across space, but it's a acceptable amount of error given the small scale we're working at. 
 
-```{r}
+```{r, eval=FALSE, echo=TRUE}
 #generate 
 final_population$area<-final_population%>%
   st_area()
 
+st_crs(final_population)
+st_crs(districts1)
 #segmenting block groups by district, convex hull boundaries, and boundary circles. 
 district_fragments <- st_intersection(final_population, districts1)
 chull_fragments <- st_intersection(final_population, districts_convex)
@@ -383,7 +384,7 @@ bound_pop <- boundcirc_fragments %>%
 
 Now, conducting the same style intersection -> area weighting -> reaggregation for precinct data, saving back the democratic vote share as a percentage. 
 
-```{r}
+```{r, eval=FALSE, echo=TRUE}
 precincts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "precincts20")
 # 15 precincts hace geometry issues- thus, repair. 
 precincts <- st_make_valid(precincts)%>%
@@ -448,7 +449,7 @@ boundcirc_votes <- boundcirc_precincts %>%
 
 Having created everything, I'm going to append data to a final table with attached geometry. I'll conduct the final calculations in this table. 
 
-```{r}
+```{r, eval=FALSE, echo=TRUE}
 #creating the full table from derived data products
 gerrymander_data<- tibble(districts1$DISTRICT,
                           compactness_summary$`Polsby_Popper`,
@@ -467,7 +468,7 @@ gerrymander_data<- tibble(districts1$DISTRICT,
 
 To craft an index that combines the geographic compactness measurements with demographic information, I'm going to take the difference in the black population that lives within each *district* and subtract the percentage black population that lives within each district's *convex hull* and *minimum bounding circle*. If the resulting number is negative it means that the district is whiter than the surrounding area; if it's positive, it means that the district has a higher percentage of black residents than the surrounding area. A district that had a equally black population to the surrounding area (or had a geometry the meant that either it's corresponding convex hull or minimum bounding circle was the exact size of the district itself) would have a score of 0. 
 
-```{r}
+```{r, eval=FALSE, echo=TRUE}
 #calculate the nerbonne metric
 gerrymander_data<- gerrymander_data%>%
   mutate(Nerbonne_convex = district_pop$black_pct-chull_pop$black_pct,
