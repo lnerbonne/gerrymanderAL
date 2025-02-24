@@ -52,7 +52,7 @@ I plan on using ___ for ____.
 # record all the packages you are using here
 # this includes any calls to library(), require(),
 # and double colons such as here::i_am()
-packages <- c("tidyverse", "here", "sf", "tmap", "tidycensus")
+packages <- c("tidyverse", "here", "sf", "tmap", "tidycensus", "lwgeom")
 
 # force all conflicts to become errors
 # if you load dplyr and use filter(), R has to guess whether you mean dplyr::filter() or stats::filter()
@@ -184,11 +184,8 @@ P4_006N | Total black population over 18 | Total black population over 18 years 
 
 ## Prior observations/bias  
 
-Prior experience with the study area, prior data collection, or prior observation of the data can compromise the validity of a study, e.g. through p-hacking.
-Therefore, disclose any prior experience or observations at the time of study pre-registration here, with example text below:
-
 At the time of this study pre-registration, the authors had very little prior knowledge of the geography of the study region with regards to the potential gerrymandering congressional districts.
-The study authors have some prior knowlege of the racial distribution of populations in the state as they pertain to historical settlement (oftentimes forced) patterns. 
+The study authors have some prior knowledge of the racial distribution of populations in the state as they pertain to historical settlement (oftentimes involuntary) patterns. 
 
 For each secondary source, declare the extent to which authors had already engaged with the data:
 
@@ -273,8 +270,13 @@ Black_Percentage: The percentage of each census block that at minimum partially 
 I'll calculate three separate compactness metrics that all are in the form of area vs perimeter (Polsby-Popper metric), convex hull area, and minimum bounding circle area. 
 
 ```{r}
-library(sf)
+#sf_use_s2 is set to FALSE to calculate ellipsoidal area instead of spherical  
+sf_use_s2(FALSE)
+
+#read in districts 
 districts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "districts23")
+
+#calculate area/perimeter metric (polsby-popper)
 districts1 <- mutate(districts, 
                      districts_area = st_area(geom),
                      districts_perim = st_perimeter(geom),
@@ -287,67 +289,225 @@ districts1 <- mutate(districts,
 #create a seperate layer, districts_convex, that saves creates a convex hull for each district
 districts_convex <- districts1%>%
   st_convex_hull()
-districts_convex <- districts_convex |> 
+districts_convex <- districts_convex %>% 
   mutate(hullarea = st_area(geom),
          compact_hull = round(as.numeric(districts_area / hullarea), 2))
 
-#calculates the area of the convex hull of each district 
-districts_convex<- districts_convex%>%
-  mutate(ch_area = st_area(districts_convex))
+#create a third layer, bound_circle, that will store the minimum bounding circle metric
+bound_circle<- districts1%>%
+  st_minimum_bounding_circle()
+bound_circle <- bound_circle %>%
+  mutate(bound_circle,
+         mbcarea = st_area(geom),
+         compact_circ = round(as.numeric(districts_area / mbcarea), 2))
+
+#combine all into a table
+compactness_summary<- tibble(districts$DISTRICT, districts1$polsby_popper, districts_convex$compact_hull, bound_circle$compact_circ, districts$geom)
+#change the column names
+colnames(compactness_summary)<- c("District", "Polsby_Popper", "Convex_Hull", "Minimum_Bounding_Circle", "geom")
+
 
 ```
 
-This gives us both district and the convex hull of each district layers 
+This gives us the compactness scores from each of our three metrics in the same df, ready to be mapped. We also still retain the three seperate geometries used to calculate area for the compactness metrics, which will be potentially useful down the road. 
 
-#drop geometry of the convex hull layer
-districts_convex_df <- st_drop_geometry(districts_convex)
+###Race
 
-#join the convex hull df to the districts geometries, matching the congressional district numerical designation.
-districts <- left_join(districts, select(districts_convex_df, DISTRICT, ch_area, total_pop_ch, total_black_pop_ch, by = "DISTRICT")
+To gather the population race breakdown for each district, we'll employ our block group data that we cleaned earlier. The block group data needs to be split by district, convex hull, and minimum bounding circle so that we can get an accurate measure of population- to do this, it also needs to undergo area weighted reaggregation to properly apportion population on either side of a split. This introduces more error into our calculations, as people don't evenly distribute across space, but it's a acceptable amount of error given the small scale we're working at. 
+
+```{r}
+#generate 
+final_population$area<-final_population%>%
+  st_area()
+
+#segmenting block groups by district, convex hull boundaries, and boundary circles. 
+district_fragments <- st_intersection(final_population, districts1)
+chull_fragments <- st_intersection(final_population, districts_convex)
+boundcirc_fragments <- st_intersection(final_population, bound_circle)
+
+#calculating area weighted aggregation and re-grouping by district
+district_fragments <- district_fragments%>%
+                    mutate(
+                    new_area = st_area(geometry),
+                    aw = as.numeric(new_area / area),
+                    aw_pop = aw * Total_POP,
+                    aw_black = aw * Black_POP,
+                    aw_blackpct = aw_pop * aw_black)
+
+district_pop <- district_fragments %>%
+  group_by(DISTRICT)%>%
+  summarize(
+    sumpop = sum(aw_pop),
+    sumblack = sum(aw_black),
+    black_pct = sumblack/sumpop,
+    geom = st_union(geometry)
+  )
+
+#calculating area weighted aggregation and re-grouping by convex hull
+chull_fragments <- chull_fragments%>%
+                    mutate(
+                    new_area = st_area(geometry),
+                    aw = as.numeric(new_area / area),
+                    aw_pop = aw * Total_POP,
+                    aw_black = aw * Black_POP,
+                    aw_blackpct = aw_pop * aw_black)
+
+chull_pop <- chull_fragments %>%
+  group_by(DISTRICT) %>%
+  summarize(
+    sumpop = sum(aw_pop),
+    sumblack = sum(aw_black),
+    black_pct = sumblack/sumpop,
+    geom = st_union(geometry)
+  )
+
+##calculating area weighted aggregation and re-grouping by minimum bounding circle
+boundcirc_fragments <- boundcirc_fragments%>%
+                    mutate(
+                    new_area = st_area(geometry),
+                    aw = as.numeric(new_area / area),
+                    aw_pop = aw * Total_POP,
+                    aw_black = aw * Black_POP,
+                    aw_blackpct = aw_pop * aw_black)
+
+bound_pop <- boundcirc_fragments %>%
+  group_by(DISTRICT)%>% 
+  summarize(
+    sumpop = sum(aw_pop),
+    sumblack = sum(aw_black),
+    black_pct = sumblack/sumpop,
+    geom = st_union(geometry)
+  )
+
 ```
 
-### Compactness metric
+Now, conducting the same style intersection -> area weighting -> reaggregation for precinct data, saving back the democratic vote share as a percentage. 
+
+```{r}
+precincts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "precincts20")
+# 15 precincts hace geometry issues- thus, repair. 
+precincts <- st_make_valid(precincts)%>%
+  mutate(area= st_area(geom))
+
+#segmenting block groups by district, convex hull boundaries, and boundary circles. 
+district_fragments <- st_intersection(precincts, districts1)
+chull_precincts <- st_intersection(precincts, districts_convex)
+boundcirc_precincts <- st_intersection(precincts, bound_circle)
+
+#calculating area weighted aggregation and re-grouping by district
+district_fragments <- district_fragments%>%
+                    mutate(
+                    new_area = st_area(geom),
+                    aw = as.numeric(new_area / area),
+                    aw_total = aw * (G20PREDBID+G20PRERTRU+ G20PRELJOR + G20PREOWRI),
+                    aw_total_democrat = aw * G20PREDBID,
+                    aw_percent_dem = aw_total_democrat/aw_total)
+                    
+
+district_votes <- district_fragments %>%
+  group_by(DISTRICT)%>%
+  summarize(
+    total_votes = sum(aw_total),
+    total_dem = sum(aw_total_democrat),
+    percent_dem = total_dem/total_votes)
+
+#calculating area weighted aggregation and re-grouping by convex hull geometry
+chull_precincts <- chull_precincts%>%
+                    mutate(
+                    new_area = st_area(geom),
+                    aw = as.numeric(new_area / area),
+                    aw_total = aw * (G20PREDBID+G20PRERTRU+ G20PRELJOR + G20PREOWRI),
+                    aw_total_democrat = aw * G20PREDBID,
+                    aw_percent_dem = aw_total_democrat/aw_total)
+                    
+
+chull_votes <- chull_precincts %>%
+  group_by(DISTRICT)%>%
+  summarize(
+    total_votes = sum(aw_total),
+    total_dem = sum(aw_total_democrat),
+    percent_dem = total_dem/total_votes)
+
+#calculating area weighted aggregation and re-grouping by minimum bounding circle geometry
+boundcirc_precincts <- boundcirc_precincts%>%
+                    mutate(
+                    new_area = st_area(geom),
+                    aw = as.numeric(new_area / area),
+                    aw_total = aw * (G20PREDBID+G20PRERTRU+ G20PRELJOR + G20PREOWRI),
+                    aw_total_democrat = aw * G20PREDBID,
+                    aw_percent_dem = aw_total_democrat/aw_total)
+                    
+
+boundcirc_votes <- boundcirc_precincts %>%
+  group_by(DISTRICT)%>%
+  summarize(
+    total_votes = sum(aw_total),
+    total_dem = sum(aw_total_democrat),
+    percent_dem = total_dem/total_votes)
+```
+
+Having created everything, I'm going to append data to a final table with attached geometry. I'll conduct the final calculations in this table. 
+
+```{r}
+#creating the full table from derived data products
+gerrymander_data<- tibble(districts1$DISTRICT,
+                          compactness_summary$`Polsby_Popper`,
+                          compactness_summary$`Convex_Hull`,
+                          compactness_summary$`Minimum_Bounding_Circle`,
+                          district_pop$black_pct,
+                          chull_pop$black_pct,
+                          bound_pop$black_pct,
+                          district_votes$percent_dem,
+                          chull_votes$percent_dem,
+                          boundcirc_votes$percent_dem)
+
+```
+
+### Final Calcualtions
+
+To craft an index that combines the geographic compactness measurements with demographic information, I'm going to take the difference in the black population that lives within each *district* and subtract the percentage black population that lives within each district's *convex hull* and *minimum bounding circle*. If the resulting number is negative it means that the district is whiter than the surrounding area; if it's positive, it means that the district has a higher percentage of black residents than the surrounding area. A district that had a equally black population to the surrounding area (or had a geometry the meant that either it's corresponding convex hull or minimum bounding circle was the exact size of the district itself) would have a score of 0. 
+
+```{r}
+#calculate the nerbonne metric
+gerrymander_data<- gerrymander_data%>%
+  mutate(Nerbonne_convex = district_pop$black_pct-chull_pop$black_pct,
+         Nerbonne_minimum_bounding = `district_pop$black_pct`- bound_pop$black_pct)
+#append geometry to districts 
+gerrymander_data$Geometry<- districts$geom
+
+#rename columns for readability
+colnames(gerrymander_data)<- c("District", "Polsby-Popper", "Convex Hull", "Minimum Bounding Circle", "Percent Black Within District", "Percent Black Within CHull", "Percent Black Within MinBounds", "Percent Dem Votes in District", "Percent Dem Votes in CHull", "Percent Dem Votes in MinBounds", "Nerbonne CHull", "Nerbonne MinBounds", "Geometry")
 
 
-
-
-
-The method may anticipate **contingencies**, e.g. tests for normality and alternative decisions to make based on the results of the test.
-More specifically, all the **geographic** and **variable** transformations required to prepare input data as described in the data and variables section above to match the study's spatio-temporal characteristics as described in the study metadata and study design sections.
-Visual workflow diagrams may help communicate the methodology in this section.
-
-Examples of **geographic** transformations include coordinate system transformations, aggregation, disaggregation, spatial interpolation, distance calculations, zonal statistics, etc.
-
-Examples of **variable** transformations include standardization, normalization, constructed variables, imputation, classification, etc.
-
-Be sure to include any steps planned to **exclude** observations with *missing* or *outlier* data, to **group** observations by *attribute* or *geographic* criteria, or to **impute** missing data or apply spatial or temporal **interpolation**.
+```
 
 ## Analysis
 
-Describe the methods of analysis that will directly test the hypotheses or provide results to answer the research questions.
-This section should explicitly define any spatial / statistical *models* and their *parameters*, including *grouping* criteria, *weighting* criteria, and *significance thresholds*.
-Also explain any follow-up analyses or validations.
+Given the relatively small number of districts (7) much of the analysis will be purely observational. This will include looking at and comparing metrics across districts from a table as well as mapping those metrics so they can be put in context of the actual district shape. 
 
 # Results
 
-Describe how results are to be presented.
+Results are to be presented in a full table -- gerrymander_data -- that combines compactness metrics, voting information, percentage black residents, and the Nerbonne metric for each district. This data will still be associated with a geometry, so it's able to be mapped. 
 
 # Discussion
 
-Describe how the results are to be interpreted *vis a vis* each hypothesis or research question.
+District geometry is to be compared to it's compactness scores, which then can be interpreted through the lens of percentage black population. The effectivness of the gerrymander should be visible in the relative difference in Democratic votes in districts with low compactness (high Democratic percentage) and low compactness (less Democratic). The novel Nerbonne metric should reflect the relative difference in black voter percentage within and outside a district, which should be high in districts that have been specifically designed to condense traditionally Democratic voters in single districts. 
 
 # Integrity Statement
 
-Include an integrity statement - The authors of this preregistration state that they completed this preregistration to the best of their knowledge and that no other preregistration exists pertaining to the same hypotheses and research.
-If a prior registration *does* exist, explain the rationale for revising the registration here.
+This is the only preregistration for this research project. 
 
 # Acknowledgements
 
-- `Funding Name`: name of funding for the project
-- `Funding Title`: title of project grant
-- `Award info URI`: web address for award information
-- `Award number`: award number
+This project is part of class-based undergraduate research, and as such does not have any funding sources.
 
 This report is based upon the template for Reproducible and Replicable Research in Human-Environment and Geographical Sciences, DOI:[10.17605/OSF.IO/W29MQ](https://doi.org/10.17605/OSF.IO/W29MQ)
 
 # References
+
+Discrete Geometry for Electoral Geography; Duchin and Tennor 2024. 
+
+Gerrymandering and Compactness; Implementation Flexibility and Abuse; Barnes and Solomon 2020.
+
+Practical Application of District Compactness; Horn, Hampton and Vandenburg 1993. 
+
