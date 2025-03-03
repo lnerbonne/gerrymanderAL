@@ -50,7 +50,7 @@ Enumerate specific **hypotheses** to be tested or **research questions** to be i
 # record all the packages you are using here
 # this includes any calls to library(), require(),
 # and double colons such as here::i_am()
-packages <- c("tidyverse", "here", "sf", "tmap", "tidycensus", "lwgeom")
+packages <- c("tidyverse", "here", "sf", "tmap", "tidycensus", "lwgeom", "kableExtra")
 
 # force all conflicts to become errors
 # if you load dplyr and use filter(), R has to guess whether you mean dplyr::filter() or stats::filter()
@@ -90,7 +90,8 @@ knitr::write_bib(c(packages, "base"), file = here("software.bib"))
 # set up default knitr parameters
 # https://yihui.org/knitr/options/
 knitr::opts_chunk$set(
-  echo = FALSE, # Run code, show outputs (don't show code)
+  eval= FALSE,
+  echo = TRUE, # Run code, show outputs AND code 
   fig.retina = 4,
   fig.width = 8,
   fig.path = paste0(here("results", "figures"), "/")
@@ -160,6 +161,24 @@ P4_006N | Total black population over 18 | Total black population over 18 years 
 | G20PRETRU | Republican Voters | Total votes for Donald Trump in 2020 | Numeric | ... | ... | ... | ... |
 | G20PREBID | Democratic Voters | Total votes for Joe Biden in 2020 | Numeric | ... | ... | ... | ... |
 
+```{r, echo= TRUE, cache=TRUE}
+precincts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "precincts20")
+# 15 precincts have geometry issues- thus, repair. 
+precincts <- st_make_valid(precincts)%>%
+  mutate(area= st_area(geom))
+precincts<- precincts%>%
+  mutate(vote_swing= G20PREDBID-G20PRERTRU)
+
+tmap_mode(mode = "plot")
+vote_swing <- tm_shape(precincts) + 
+  tm_polygons(
+    fill = "vote_swing",
+    col_alpha = 0.2,
+    fill.scale = tm_scale_continuous(values = "brewer.rd_bu"))
+
+vote_swing
+```
+
 ### districts23 Layer of districts.gpkg
 
 - `Abstract`: Spatial bounds and characteristics of U.S. Congressional districts in Alabama
@@ -179,7 +198,24 @@ P4_006N | Total black population over 18 | Total black population over 18 years 
 | WHITE | Number of white residents | Total number of white residents (2020 census) | Numeric | The US Census tends to overcount white populations and undercount those of minorities ([US Census](https://www.census.gov/newsroom/press-releases/2022/2020-census-estimates-of-undercount-and-overcount.html)) | ... | ... | ... |
 | BLACK | Number of black residents | Total number of black residents (US Census) | Numeric | The US Census tends to overcount white populations and undercount those of minorities ([US Census](https://www.census.gov/newsroom/press-releases/2022/2020-census-estimates-of-undercount-and-overcount.html)) | ... | ... | ... |
 
+```{r, echo=True, cache=TRUE}
+#mapping the outputted districts
+districts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "districts23")
 
+tmap_mode(mode = "plot")
+districts21map <- districts |> 
+  tm_shape() +
+  tm_polygons(fill_alpha = 0,
+              col = "red") +
+  tm_labels(text = "DISTRICT",
+          col="red",
+          bgcol = "white",
+          bgcol_alpha = 0.5,
+          on_surface = TRUE,
+          just = c("center", "center")
+          )
+districts21map
+```
 ## Prior observations/bias  
 
 At the time of this study pre-registration, the authors had very little prior knowledge of the geography of the study region with regards to the potential gerrymandering congressional districts.
@@ -234,7 +270,7 @@ blockgroups<-blockgroups%>%
 
 The Census makes it tricky to pull the 'black' population data because of the plethora of different combinations of race designations that respondents can use to describe their racial identity. For example, someone who responds that they are both Hispanic AND Black, they will have a different designation than someone who responds as only black. For this study, we're going to consider the hispanic and black individual black, so that designation's population total will need to be added to the overall black population total.
 
-To gather this data, I'll gather a list of all the words that might be used to describe a black individual. Code courtesy of Joseph Holler's Github, because I had no idea how to do this.
+To gather this data, I'll gather a list of all the race designations that have the work "Black" listed somewhere in the name.
 
 ```{r, eval=FALSE, echo=TRUE}
 pulled_metadata <- load_variables(2020, "pl")
@@ -264,16 +300,36 @@ Total_POP: Total population in each census block
 Black_POP: Total black population in each census block
 Black_Percentage: The percentage of each census block that at minimum partially identifies as black
 
-### Calculate area for each district
+Mapped Black_Percentage by block group, with district borders overlain. A pattern is already emerging, with majority-black districts lumped into several districts. 
 
-I'll calculate three separate compactness metrics that all are in the form of area vs perimeter (Polsby-Popper metric), convex hull area, and minimum bounding circle area. 
+```{r, echo= TRUE, cache=TRUE}
+tmap_mode(mode = "view")
+black_percentage <- tm_shape(final_population) + 
+  tm_polygons(
+    fill = "Black_Percentage",
+    col_alpha = 0.2,
+    fill.scale = tm_scale_continuous(values = "brewer.blues"))
+
+black_percentage+ districts |> 
+  tm_shape() +
+  tm_polygons(fill_alpha = 0,
+              col = "red",
+              col_alpha = 0.8)
+
+```
+
+
+#Analysis
+
+With our census data cleaned and black population numbers gathered, I'll now seek to quantify spatial gerrymandering in the district organization by calculating different metrics of spatial compactness before diving into how to quantify the difference in racial makeup within vs. outside each district boundary. 
+
+### Calculating Compactness Metrics
+
+I'll calculate three separate compactness metrics that all are in the form of area vs perimeter (Polsby-Popper metric), convex hull area, and minimum bounding circle area. To do this, I need the initial area of the districts, along with the areas of their associated products (convex hull, min bounding circle)
 
 ```{r, eval=FALSE, echo=TRUE}
-#sf_use_s2 is set to FALSE to calculate ellipsoidal area instead of spherical  
+#sf_use_s2 is set to FALSE to calculate ellipsoidal area instead of spherical for more accurate area calculation. 
 sf_use_s2(FALSE)
-
-#read in districts 
-districts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "districts23")
 
 #calculate area/perimeter metric (polsby-popper)
 districts1 <- mutate(districts, 
@@ -285,7 +341,7 @@ districts1 <- mutate(districts,
                        2))%>%
   select(DISTRICT, districts_area, districts_perim,polsby_popper)
 
-#create a seperate layer, districts_convex, that saves creates a convex hull for each district
+#create a separate layer, districts_convex, that saves creates a convex hull for each district
 districts_convex <- districts1%>%
   st_convex_hull()
 districts_convex <- districts_convex %>% 
@@ -308,7 +364,14 @@ colnames(compactness_summary)<- c("District", "Polsby_Popper", "Convex_Hull", "M
 
 ```
 
-This gives us the compactness scores from each of our three metrics in the same df, ready to be mapped. We also still retain the three seperate geometries used to calculate area for the compactness metrics, which will be potentially useful down the road. 
+This gives us the compactness scores from each of our three metrics in the same df, ready to be mapped. We also still retain the three seperate geometries used to calculate area for the compactness metrics, which will be potentially useful down the road. Here's the resulting table: 
+
+```{r, echo= FALSE, cache=TRUE}
+compactness_summary%>%
+  dplyr::select(-geom)%>%
+kbl(col.names = c("District", "Polsby-Popper CM", "Convex Hull CM", "Minimum Bounding Circle CM")) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
 
 ###Race
 
@@ -385,11 +448,6 @@ bound_pop <- boundcirc_fragments %>%
 Now, conducting the same style intersection -> area weighting -> reaggregation for precinct data, saving back the democratic vote share as a percentage. 
 
 ```{r, eval=FALSE, echo=TRUE}
-precincts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "precincts20")
-# 15 precincts hace geometry issues- thus, repair. 
-precincts <- st_make_valid(precincts)%>%
-  mutate(area= st_area(geom))
-
 #segmenting block groups by district, convex hull boundaries, and boundary circles. 
 district_fragments <- st_intersection(precincts, districts1)
 chull_precincts <- st_intersection(precincts, districts_convex)
