@@ -314,8 +314,14 @@ black_percentage+ districts |>
   tm_shape() +
   tm_polygons(fill_alpha = 0,
               col = "red",
-              col_alpha = 0.8)
-
+              col_alpha = 0.8)+
+  tm_labels(text = "DISTRICT",
+          col="red",
+          bgcol = "white",
+          bgcol_alpha = 0.7,
+          on_surface = TRUE,
+          just = c("center", "center")
+          )
 ```
 
 
@@ -445,7 +451,7 @@ bound_pop <- boundcirc_fragments %>%
 
 ```
 
-Now, conducting the same style intersection -> area weighting -> reaggregation for precinct data, saving back the democratic vote share as a percentage. 
+Now, conducting the same style intersection -> area weighting -> re-aggregation for precinct data, saving back the democratic vote share as a percentage. 
 
 ```{r, eval=FALSE, echo=TRUE}
 #segmenting block groups by district, convex hull boundaries, and boundary circles. 
@@ -529,28 +535,90 @@ To craft an index that combines the geographic compactness measurements with dem
 ```{r, eval=FALSE, echo=TRUE}
 #calculate the nerbonne metric
 gerrymander_data<- gerrymander_data%>%
-  mutate(Nerbonne_convex = district_pop$black_pct-chull_pop$black_pct,
-         Nerbonne_minimum_bounding = `district_pop$black_pct`- bound_pop$black_pct)
+  mutate(difference_convex = district_pop$black_pct-chull_pop$black_pct,
+         difference_minimum_bounding = `district_pop$black_pct`- bound_pop$black_pct)
 #append geometry to districts 
 gerrymander_data$Geometry<- districts$geom
 
 #rename columns for readability
-colnames(gerrymander_data)<- c("District", "Polsby-Popper", "Convex Hull", "Minimum Bounding Circle", "Percent Black Within District", "Percent Black Within CHull", "Percent Black Within MinBounds", "Percent Dem Votes in District", "Percent Dem Votes in CHull", "Percent Dem Votes in MinBounds", "Nerbonne CHull", "Nerbonne MinBounds", "Geometry")
-
-
+colnames(gerrymander_data)<- c("District", "Polsby-Popper", "Convex Hull", "Minimum Bounding Circle", "Percent Black Within District", "Percent Black Within CHull", "Percent Black Within MinBounds", "Percent Dem Votes in District", "Percent Dem Votes in CHull", "Percent Dem Votes in MinBounds", "Difference between CHull and District", "Difference between MinBounds and District", "Geometry")
 ```
 
-## Analysis
-
-Given the relatively small number of districts (7) much of the analysis will be purely observational. This will include looking at and comparing metrics across districts from a table as well as mapping those metrics so they can be put in context of the actual district shape. 
 
 # Results
 
-Results are to be presented in a full table -- gerrymander_data -- that combines compactness metrics, voting information, percentage black residents, and the Nerbonne metric for each district. This data will still be associated with a geometry, so it's able to be mapped. 
+The calculated compactness metrics have a somewhat inverse relationship with the percent democratic vote, indicating that gerrymandering is clustering democratic votes together in similar districts. 
+
+
+```{r, echo=FALSE, cache=TRUE}
+gerrymander_data%>%
+  dplyr::select(-Geometry)%>%
+kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+
+```
+
+```{r, echo=FALSE, cache=TRUE}
+cor_matrix <- gerrymander_data |> 
+  st_drop_geometry() |> 
+  select(`Percent Black Within District`,
+         `Difference between CHull and District`, 
+         `Percent Black Within MinBounds`,
+         `Polsby-Popper`,
+         `Convex Hull`,
+         `Minimum Bounding Circle`,
+         `Percent Dem Votes in District`)
+
+cor_matrix %>% 
+  cor() %>% 
+  kbl()%>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
+```
+
+```{r}
+cor_matrix |> pairs()
+```
+
+
+```{r, echo=FALSE, cache=TRUE}
+gerrymander_data_plot_race <- gerrymander_data |> 
+  st_drop_geometry() |> 
+  select(District, `Percent Dem Votes in District`, `Difference between CHull and District`, `Polsby-Popper`, `Convex Hull`,  `Minimum Bounding Circle`) |> 
+  pivot_longer(cols = c(`Polsby-Popper`,`Convex Hull`,`Minimum Bounding Circle`))
+
+gerrymander_data_plot_race |> ggplot() +
+  aes(x = `Percent Dem Votes in District`, y = value) +
+  geom_smooth(method="lm", col = "grey30") +
+  geom_label(aes(label = District, fill = `Percent Dem Votes in District`)) +
+  xlab("Percent Democratic Voters by District")+
+  scale_fill_distiller(type = "div", palette = "PRGn") +
+
+  facet_wrap(~name)
+```
+
+As you can see in the graphs from above as the percent black population in each district increases, so does the different in percent black population between the district itself and the surrounding areas. This is indicated with >0 along the chart's x axis. What's most interesting about this panel of plots is that as this difference metric increases, the spatial gerrymandering metrics which are often used to verify the relative 'fairness' of a district ALSO increase, indicating on average the more segregated/packed districts score better than those that are majority white. 
+
+```{r. echo=FALSE, cache=TRUE}
+gerrymander_data_plot_race <- gerrymander_data |> 
+  st_drop_geometry() |> 
+  select(District, `Percent Black Within District`, `Difference between CHull and District`, `Polsby-Popper`, `Convex Hull`,  `Minimum Bounding Circle`) |> 
+  pivot_longer(cols = c(`Polsby-Popper`,`Convex Hull`,`Minimum Bounding Circle`))
+
+gerrymander_data_plot_race |> ggplot() +
+  aes(x = `Difference between CHull and District`, y = value) +
+  geom_smooth(method="lm", col = "grey30") +
+  geom_label(aes(label = District, fill = `Percent Black Within District`)) +
+  xlab("Difference in Percent Black Population between CHull and District")+
+  scale_fill_distiller(type = "div", palette = "PRGn") +
+
+  facet_wrap(~name)
+```
+
+Viewed instead from a lens of actual vote results, we can again see a pattern of relative indifference in the spatial gerrymandering metrics between heavily Republican and Democratic districts, especially when using the Convex Hull and Minimum Bounding Circle methods. The Polsby-Popper area-perimeter method has some negative relationship between Democratic voter percentage and resulting score, but the trend is less dramatic than probably is expected. 
 
 # Discussion
 
-District geometry is to be compared to it's compactness scores, which then can be interpreted through the lens of percentage black population. The effectivness of the gerrymander should be visible in the relative difference in Democratic votes in districts with low compactness (high Democratic percentage) and low compactness (less Democratic). The novel Nerbonne metric should reflect the relative difference in black voter percentage within and outside a district, which should be high in districts that have been specifically designed to condense traditionally Democratic voters in single districts. 
+District geometry is to be compared to it's compactness scores, which then can be interpreted through the lens of percentage black population. The effectiveness of the gerrymander should be visible in the relative difference in Democratic votes in districts with low compactness (high Democratic percentage) and low compactness (less Democratic). The novel Nerbonne metric should reflect the relative difference in black voter percentage within and outside a district, which should be high in districts that have been specifically designed to condense traditionally Democratic voters in single districts. 
 
 # Integrity Statement
 
