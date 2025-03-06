@@ -1,4 +1,4 @@
 path,name,metadata,description
 raw/public/districts.gpkg:precincts20,2020 Voting Precincts,gerrymeanderAL/data/metadata/precincts20.md,Voting Precincts with 2020 Election Results
-raw/public/districts.gpkg:districts21,,,
-raw/public/districts.gpkg:districts23,,,
+raw/public/districts.gpkg:districts23,2023 Voting Districts,gerrymeanderAL/data/metadata/districts23.md,2023 District Boundaries
+tidycensus API, 2020 Alabama Block Groups, N/A, Population data divided by block group as sampled by the US Census during the 2020 Census
