@@ -44,7 +44,7 @@ Enumerate specific **hypotheses** to be tested or **research questions** to be i
 
 ## Computational environment
 
-```{r environment-setup, echo=1:4}
+```{r environment-setup, echo=1:4, warning=FALSE, message=FALSE}
 # record all the packages you are using here
 # this includes any calls to library(), require(),
 # and double colons such as here::i_am()
@@ -88,8 +88,11 @@ knitr::write_bib(c(packages, "base"), file = here("software.bib"))
 # set up default knitr parameters
 # https://yihui.org/knitr/options/
 knitr::opts_chunk$set(
-  eval= FALSE,
-  echo = TRUE, # Run code, show outputs AND code 
+  eval= TRUE,
+  echo = TRUE,
+  cache = TRUE,
+  warning = FALSE,
+  message = FALSE,
   fig.retina = 4,
   fig.width = 8,
   fig.path = paste0(here("results", "figures"), "/")
@@ -128,8 +131,15 @@ Each of the next subsections describes one data source.
 - `Constraints`: Public Domain data free for use and redistribution.
 
 Aquiring data using **tidycensus** in *R* 
-```{r, echo=TRUE}
-blockgroups <- get_decennial(geography = "block group",
+```{r, echo=TRUE, message= FALSE, warning= FALSE}
+blockgroup_file <- here("data", "raw", "public", "block_groups.gpkg")
+
+# if the data is already downloaded, just load it
+# otherwise, query from the census and save
+if(file.exists(blockgroup_file)){
+  blockgroups <- st_read(blockgroup_file, quiet = TRUE)
+} else {
+  blockgroups <- get_decennial(geography = "block group",
                                sumfile = "pl",
                                table = "P3",
                                year = 2020,
@@ -137,6 +147,8 @@ blockgroups <- get_decennial(geography = "block group",
                                output = "wide",
                                geometry = TRUE,
                                keep_geo_vars = TRUE)
+  st_write(blockgroups, blockgroup_file)
+}
 ```
 
 
@@ -168,14 +180,18 @@ P4_006N | Total black population over 18 | Total black population over 18 years 
 | G20PRETRU | Republican Voters | Total votes for Donald Trump in 2020 | Numeric | ... | ... | ... | ... |
 | G20PREBID | Democratic Voters | Total votes for Joe Biden in 2020 | Numeric | ... | ... | ... | ... |
 
-```{r, echo= TRUE}
-precincts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "precincts20")
+```{r, echo= TRUE, cache= TRUE}
+precincts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "precincts20", quiet = TRUE)
 # 15 precincts have geometry issues- thus, repair. 
 precincts <- st_make_valid(precincts)%>%
   mutate(area= st_area(geom))
 precincts<- precincts%>%
   mutate(vote_swing= G20PREDBID-G20PRERTRU)
+```
 
+Here's the precinct data colored by vote swing- positive values are more Democratic while negative values are more Republican.
+
+```{r, echo=FALSE}
 tmap_mode(mode = "plot")
 vote_swing <- tm_shape(precincts) + 
   tm_polygons(
@@ -183,8 +199,9 @@ vote_swing <- tm_shape(precincts) +
     col_alpha = 0.2,
     fill.scale = tm_scale_continuous(values = "brewer.rd_bu"))
 
-plot(vote_swing)
+vote_swing
 ```
+
 
 ### districts23 Layer of districts.gpkg
 
@@ -207,8 +224,12 @@ plot(vote_swing)
 
 ```{r, echo=TRUE}
 #mapping the outputted districts
-districts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "districts23")
+districts <- st_read(here("data", "raw", "public", "alabama", "districts.gpkg"), layer = "districts23", quiet = TRUE)
+```
 
+Mapped 2023 Districts: 
+
+```{r, echo=FALSE}
 tmap_mode(mode = "plot")
 districts23map <- districts |> 
   tm_shape() +
@@ -223,29 +244,26 @@ districts23map <- districts |>
           )
 districts23map
 ```
+
+
+
+
 ## Prior observations/bias  
+
 
 At the time of this study pre-registration, the authors had very little prior knowledge of the geography of the study region with regards to the potential gerrymandering congressional districts.
 The study authors have some prior knowledge of the racial distribution of populations in the state as they pertain to historical settlement (oftentimes involuntary) patterns. 
 
 For each secondary source, declare the extent to which authors had already engaged with the data:
 
-###Alabama Census Block Groups
+### Alabama Census Block Groups
 - [ ] data is not available yet
 - [x] data is available, but only metadata has been observed
 - [ ] metadata and descriptive statistics have been observed
 - [ ] metadata and a pilot test subset or sample of the full dataset have been observed
 - [ ] the full dataset has been observed. Explain how authors have already manipulated / explored the data.
 
-###2020 Presidential Election Voting Precincts
-- [ ] data is not available yet
-- [x] data is available, but only metadata has been observed
-- [ ] metadata and descriptive statistics have been observed
-- [ ] metadata and a pilot test subset or sample of the full dataset have been observed
-- [ ] the full dataset has been observed. Explain how authors have already manipulated / explored the data.
-- [ ] data is not available yet
-
-###Districts23 layer of districts.gpkg
+### 2020 Presidential Election Voting Precincts
 - [ ] data is not available yet
 - [x] data is available, but only metadata has been observed
 - [ ] metadata and descriptive statistics have been observed
@@ -253,7 +271,15 @@ For each secondary source, declare the extent to which authors had already engag
 - [ ] the full dataset has been observed. Explain how authors have already manipulated / explored the data.
 - [ ] data is not available yet
 
+### Districts23 layer of districts.gpkg
+- [ ] data is not available yet
+- [x] data is available, but only metadata has been observed
+- [ ] metadata and descriptive statistics have been observed
+- [ ] metadata and a pilot test subset or sample of the full dataset have been observed
+- [ ] the full dataset has been observed. Explain how authors have already manipulated / explored the data.
+- [ ] data is not available yet
 
+  
 ## Bias and threats to validity
 
 Because primary data is not being incorporated in this study, potential sources of bias are limited. The data utilized in this study is generally considered reputable (census, voting totals),
@@ -262,6 +288,7 @@ Because it's difficult to know how this systemic undercounting might effect area
 
 
 ## Data transformations
+
 
 ### Coordinate Transformation
 
@@ -306,9 +333,10 @@ Total_POP: Total population in each census block
 Black_POP: Total black population in each census block
 Black_Percentage: The percentage of each census block that at minimum partially identifies as black
 
-Mapped Black_Percentage by block group, with district borders overlain. A pattern is already emerging, with majority-black districts lumped into several districts. 
+Below is the mapped Black_Percentage by block group, with district borders overlain. A pattern is already emerging, with majority-black districts lumped into several districts. Feel free to explore it for yourself: 
 
-```{r, echo= TRUE, cache=TRUE}
+
+```{r, echo= FALSE, cache=TRUE}
 tmap_mode(mode = "view")
 black_percentage <- tm_shape(final_population) + 
   tm_polygons(
@@ -323,10 +351,11 @@ black_percentage+ districts |>
               col_alpha = 0.8)
 ```
 
-
-# Analysis
+  
+## Analysis
 
 With our census data cleaned and black population numbers gathered, I'll now seek to quantify spatial gerrymandering in the district organization by calculating different metrics of spatial compactness before diving into how to quantify the difference in racial makeup within vs. outside each district boundary. 
+
 
 ### Calculating Compactness Metrics
 
@@ -371,13 +400,14 @@ colnames(compactness_summary)<- c("District", "Polsby_Popper", "Convex_Hull", "M
 
 This gives us the compactness scores from each of our three metrics in the same df, ready to be mapped. We also still retain the three separate geometries used to calculate area for the compactness metrics, which will be potentially useful down the road. Here's the resulting table: 
 
-```{r, cache=TRUE}
+```{r, cache=TRUE, echo=FALSE}
 compactness_summary_table<-compactness_summary%>%
   dplyr::select(-geom)%>%
 kbl(col.names = c("District", "Polsby-Popper CM", "Convex Hull CM", "Minimum Bounding Circle CM")) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed", "responsive"))
 compactness_summary_table
 ```
+
 
 ### Race
 
@@ -387,6 +417,7 @@ To gather the population race breakdown for each district, we'll employ our bloc
 #generate 
 final_population$area<-final_population%>%
   st_area()
+final_population<- st_transform(final_population, 4269)
 
 #segmenting block groups by district, convex hull boundaries, and boundary circles. 
 district_fragments <- st_intersection(final_population, districts1)
@@ -526,12 +557,13 @@ gerrymander_data<- tibble(districts1$DISTRICT,
 
 ```
 
+
 ### Final Calcualtions
 
-To craft an index that combines the geographic compactness measurements with demographic information, I'm going to take the difference in the black population that lives within each *district* and subtract the percentage black population that lives within each district's *convex hull* and *minimum bounding circle*. If the resulting number is negative it means that the district is whiter than the surrounding area; if it's positive, it means that the district has a higher percentage of black residents than the surrounding area. A district that had a equally black population to the surrounding area (or had a geometry the meant that either it's corresponding convex hull or minimum bounding circle was the exact size of the district itself) would have a score of 0. 
+To craft an index that combines the geographic compactness measurements with demographic information, I'm going to take the absolute value of the difference in the black population that lives within each *district* and subtract the percentage black population that lives within each district's *convex hull* and *minimum bounding circle*. The higher the number is, the greater difference there will be between the population within the district and within either the convex hull or min bounding circle. 
 
 ```{r, echo=TRUE}
-#calculate the nerbonne metric
+#calculate the combined population and spatial distribution metric
 gerrymander_data<- gerrymander_data%>%
   mutate(difference_convex = abs(district_pop$black_pct-chull_pop$black_pct),
          difference_minimum_bounding = abs(`district_pop$black_pct`- bound_pop$black_pct))
@@ -539,13 +571,16 @@ gerrymander_data<- gerrymander_data%>%
 gerrymander_data$Geometry<- districts$geom
 
 #rename columns for readability
-colnames(gerrymander_data)<- c("District", "Polsby-Popper", "Convex Hull", "Minimum Bounding Circle", "Percent Black Within District", "Percent Black Within CHull", "Percent Black Within MinBounds", "Percent Dem Votes in District", "Percent Dem Votes in CHull", "Percent Dem Votes in MinBounds", "Absolute Value Difference between CHull and District", "Absolute Value Difference between MinBounds and District", "Geometry")
+colnames(gerrymander_data)<- c("District", "Polsby-Popper", "Convex Hull", "Minimum Bounding Circle", "Percent Black Within District", "Percent Black Within CHull", "Percent Black Within MinBounds", "Percent Dem Votes in District", "Percent Dem Votes in CHull", "Percent Dem Votes in MinBounds", "Difference between CHull and District", "Difference between MinBounds and District", "Geometry")
 ```
+
 
 
 # Results
 
-```{r, }
+
+Here's the final table with all data present; it's an eyeful.
+```{r, echo= FALSE}
 gerrymander_data%>%
   dplyr::select(-Geometry)%>%
 kbl() %>%
@@ -553,11 +588,15 @@ kbl() %>%
 
 ```
 
+
+To test the correlation between the commonly used metrics of gerrymandering and our new metric, I'll construct a correlation matrix. For simplicity, I'm only including the convex hull metric.
+
+
 ```{r, echo=FALSE}
 cor_matrix <- gerrymander_data |> 
   st_drop_geometry() |> 
-  select(`Percent Black Within District`,
-         `Absolute Value Difference between CHull and District`, 
+  select(`Difference between CHull and District`, 
+         `Percent Black Within District`,
          `Percent Black Within MinBounds`,
          `Polsby-Popper`,
          `Convex Hull`,
@@ -571,51 +610,34 @@ cor_matrix %>%
 
 ```
 
-```{r, echo=FALSE}
-cor_matrix |> pairs()
-```
-
 
 ```{r, echo=FALSE, cache=TRUE}
 gerrymander_data_plot_race <- gerrymander_data |> 
   st_drop_geometry() |> 
-  select(District, `Percent Black Within District`, `Absolute Value Difference between CHull and District`, `Polsby-Popper`, `Convex Hull`,  `Minimum Bounding Circle`) |> 
+  select(District, `Percent Black Within District`, `Difference between CHull and District`, `Polsby-Popper`, `Convex Hull`,  `Minimum Bounding Circle`) |> 
   pivot_longer(cols = c(`Polsby-Popper`,`Convex Hull`,`Minimum Bounding Circle`))
 
 gerrymander_data_plot_race |> ggplot() +
-  aes(x = `Absolute Value Difference between CHull and District`, y = value) +
+  aes(x = `Difference between CHull and District`, y = value) +
   geom_smooth(method="lm", col = "grey30") +
   geom_label(aes(label = District, fill = `Percent Black Within District`)) +
-  xlab("Absolute Value Difference in Percent Black Population between CHull and District")+
+  xlab("Difference in Percent Black Population between CHull and District")+
   scale_fill_distiller(type = "div", palette = "PRGn") +
 
   facet_wrap(~name)
 
 ```
 
-As you can see in the graphs from above as the percent black population in each district increases, so does the different in percent black population between the district itself and the surrounding areas. This is indicated with >0 along the chart's x axis. What's most interesting about this panel of plots is that as this difference metric increases, the spatial gerrymandering metrics which are often used to verify the relative 'fairness' of a district ALSO increase, indicating on average the more segregated/packed districts score better than those that are majority white. 
 
-```{r. echo=FALSE, cache=TRUE}
-gerrymander_data_plot_race <- gerrymander_data |> 
-  st_drop_geometry() |> 
-  select(District, `Percent Dem Votes in District`, `Absolute Value Difference between CHull and District`, `Polsby-Popper`, `Convex Hull`,  `Minimum Bounding Circle`) |> 
-  pivot_longer(cols = c(`Polsby-Popper`,`Convex Hull`,`Minimum Bounding Circle`))
+As you can see in the three panels above, our new metric has an interesting relationship to the commonly used gerrymandering metrics. While it has a slight positive relationship to the minimum bounding circle score, it has a strongly negative relationship to both the Convex Hull and Polsby-Popper metrics. This potentially points out flaws in the two metrics- despite having low gerrymandering scores by 2/3 of the metrics, we're still seeing packing of either black or white voters as evidenced by the demographic difference inside vs. outside the district. 
 
-gerrymander_data_plot_race |> ggplot() +
-  aes(x = `Percent Dem Votes in District`, y = value) +
-  geom_smooth(method="lm", col = "grey30") +
-  geom_label(aes(label = District, fill = `Percent Dem Votes in District`)) +
-  xlab("Percent Democratic Voters by District")+
-  scale_fill_distiller(type = "div", palette = "PRGn") +
 
-  facet_wrap(~name)
-```
+## Discussion
 
-Viewed instead from a lens of actual vote results, we can again see a pattern of relative indifference in the spatial gerrymandering metrics between heavily Republican and Democratic districts, especially when using the Convex Hull and Minimum Bounding Circle methods. The Polsby-Popper area-perimeter method has some negative relationship between Democratic voter percentage and resulting score, but the trend is less dramatic than probably is expected. 
+The new metric comparing the interior with the exterior of a district does a good job at discovering packing of black/white populations to create strongly majority districts, even when several of the commonly used metrics give the redrawn districts a pass with low scores. This underscores the importance of including comparative demographics in any determination of the degree of gerrymandering in a statem, especially when racially concentrated areas are concerned. 
 
-# Discussion
+One potential issue with this metric is it's reliance on there being sufficient area outside of the district that's still within either the district's minimum bounding circle or convex hulls. This reliance could lead to a correlation between low scores in multiple metrics. We can see this in our analysis districts like AL 3 or 5 that score relatively well in compact hull metrics *also* score very neutrally in our difference metric because there's very little area the falls within the district's convex hull but isn't in the district. What area there is is likely quite similar demographically the the district itself because it's quite close to the district border. This is in contrast to districts like AL 7, which has a large area of no overlap that has a very different racial distribution, giving it a high difference score. 
 
-District geometry is to be compared to it's compactness scores, which then can be interpreted through the lens of percentage black population. The effectiveness of the gerrymander should be visible in the relative difference in Democratic votes in districts with low compactness (high Democratic percentage) and low compactness (less Democratic). The novel Nerbonne metric should reflect the relative difference in black voter percentage within and outside a district, which should be high in districts that have been specifically designed to condense traditionally Democratic voters in single districts. 
 
 # Integrity Statement
 
